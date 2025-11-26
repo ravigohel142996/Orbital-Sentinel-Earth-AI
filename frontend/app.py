@@ -41,10 +41,10 @@ def get_api_base_url() -> str:
     """
     # Try Streamlit secrets first
     try:
-        if hasattr(st, 'secrets') and "API_BASE_URL" in st.secrets:
+        if "API_BASE_URL" in st.secrets:
             return str(st.secrets["API_BASE_URL"]).rstrip("/")
-    except Exception:
-        # secrets.toml may not exist or be misconfigured
+    except (FileNotFoundError, KeyError):
+        # secrets.toml doesn't exist or API_BASE_URL key not found
         pass
 
     # Fall back to environment variable
