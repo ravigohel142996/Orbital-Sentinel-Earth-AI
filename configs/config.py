@@ -41,7 +41,7 @@ class KafkaConfig(BaseModel):
 
 class ServerConfig(BaseModel):
     """Configuration for backend server"""
-    host: str = os.getenv("BACKEND_HOST", "localhost")
+    host: str = os.getenv("BACKEND_HOST", "0.0.0.0")
     port: int = int(os.getenv("BACKEND_PORT", "8000"))
     debug: bool = os.getenv("LOG_LEVEL", "INFO") == "DEBUG"
 

@@ -8,6 +8,7 @@ Real-time Earth risk prediction dashboard with map visualization
 import asyncio
 import base64
 import json
+import os
 import time
 from datetime import datetime
 from typing import Optional
@@ -30,7 +31,9 @@ st.set_page_config(
 # Configuration
 # ==============================================================================
 
-API_BASE_URL = "http://localhost:8000"
+# API_BASE_URL can be configured via environment variable for deployment
+# Falls back to localhost for local development
+API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000").rstrip("/")
 
 # Risk level colors - Enhanced neon palette
 RISK_COLORS = {
@@ -882,8 +885,11 @@ class OrbitalSentinelClient:
     
     def __init__(self, base_url: str = API_BASE_URL):
         self.base_url = base_url
+        self._is_online = None
+        self._last_check = 0
+        self._check_interval = 5  # seconds between online status checks
     
-    def _make_request(self, method: str, endpoint: str, **kwargs) -> Optional[dict]:
+    def _make_request(self, method: str, endpoint: str, show_error: bool = True, **kwargs) -> Optional[dict]:
         """Make HTTP request to API"""
         try:
             with httpx.Client(timeout=30.0) as client:
@@ -891,11 +897,31 @@ class OrbitalSentinelClient:
                 response.raise_for_status()
                 return response.json()
         except httpx.ConnectError:
-            st.error("⚠️ Cannot connect to backend. Please ensure the API server is running.")
+            if show_error:
+                st.error(f"⚠️ Cannot connect to backend at {self.base_url}. Please ensure the API server is running or check your API_BASE_URL configuration.")
+            return None
+        except httpx.TimeoutException:
+            if show_error:
+                st.error(f"⚠️ Connection to backend timed out. The server at {self.base_url} may be slow or unresponsive.")
+            return None
+        except httpx.HTTPStatusError as e:
+            if show_error:
+                st.error(f"API Error: HTTP {e.response.status_code} - {e.response.text[:200]}")
             return None
         except Exception as e:
-            st.error(f"API Error: {str(e)}")
+            if show_error:
+                st.error(f"API Error: {str(e)}")
             return None
+    
+    def is_backend_online(self) -> bool:
+        """Check if the backend is online with caching to avoid excessive requests"""
+        current_time = time.time()
+        if self._is_online is None or (current_time - self._last_check) > self._check_interval:
+            result = self._make_request("GET", "/health", show_error=False)
+            # Consider backend online if we get a valid response (even if status isn't "healthy")
+            self._is_online = result is not None
+            self._last_check = current_time
+        return self._is_online
     
     def health_check(self) -> Optional[dict]:
         """Check API health"""
@@ -947,42 +973,52 @@ def render_header():
 
 def render_status_bar():
     """Render the futuristic status bar with service indicators"""
-    health = client.health_check()
+    # Use the cached online check first
+    is_online = client.is_backend_online()
     
     st.markdown("""
     <div class="nav-bar">
         <div style="display: flex; gap: 30px; flex-wrap: wrap; justify-content: center; width: 100%;">
     """, unsafe_allow_html=True)
     
-    if health:
-        services = health.get("services", {})
-        
-        # Build status HTML
-        service_items = [
-            ("🤖 Gemini AI", services.get("gemini", False)),
-            ("🗣️ Voice", services.get("elevenlabs", False)),
-            ("📡 Streaming", services.get("streaming", False)),
-            ("💾 Storage", services.get("storage", False)),
-            ("🔄 Simulator", services.get("simulator", False)),
-            ("🌐 API", True)
-        ]
-        
-        status_html = ""
-        for name, is_active in service_items:
-            status_class = "status-online" if is_active else "status-offline" if name == "💾 Storage" else "status-warning"
-            status_html += f"""
-            <div class="nav-item">
-                <span class="status-dot {status_class}"></span>
-                <span>{name}</span>
+    if is_online:
+        health = client.health_check()
+        if health:
+            services = health.get("services", {})
+            
+            # Build status HTML
+            service_items = [
+                ("🤖 Gemini AI", services.get("gemini", False)),
+                ("🗣️ Voice", services.get("elevenlabs", False)),
+                ("📡 Streaming", services.get("streaming", False)),
+                ("💾 Storage", services.get("storage", False)),
+                ("🔄 Simulator", services.get("simulator", False)),
+                ("🌐 API", True)
+            ]
+            
+            status_html = ""
+            for name, is_active in service_items:
+                status_class = "status-online" if is_active else "status-offline" if name == "💾 Storage" else "status-warning"
+                status_html += f"""
+                <div class="nav-item">
+                    <span class="status-dot {status_class}"></span>
+                    <span>{name}</span>
+                </div>
+                """
+            
+            st.markdown(status_html, unsafe_allow_html=True)
+        else:
+            st.markdown(f"""
+            <div class="nav-item" style="color: #FFE66D;">
+                <span class="status-dot status-warning"></span>
+                <span>⚠️ Backend responding but health check failed - API: {client.base_url}</span>
             </div>
-            """
-        
-        st.markdown(status_html, unsafe_allow_html=True)
+            """, unsafe_allow_html=True)
     else:
-        st.markdown("""
+        st.markdown(f"""
         <div class="nav-item" style="color: #FF073A;">
             <span class="status-dot status-offline"></span>
-            <span>⚠️ Backend Offline - Please start the API server</span>
+            <span>⚠️ Backend Offline - Cannot reach {client.base_url}. Check API_BASE_URL env var or start the API server.</span>
         </div>
         """, unsafe_allow_html=True)
     

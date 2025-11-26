@@ -6,6 +6,7 @@ Main API server for risk analysis and data streaming
 """
 
 import asyncio
+import os
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -42,6 +43,13 @@ from configs.config import get_config, validate_config
 background_tasks_running = False
 simulator_task = None
 
+# CORS configuration from environment
+# ALLOWED_ORIGINS can be set as a comma-separated list of URLs, or "*" for all origins
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*")
+if ALLOWED_ORIGINS == "*":
+    cors_origins = ["*"]
+else:
+    cors_origins = [origin.strip() for origin in ALLOWED_ORIGINS.split(",") if origin.strip()]
 
 async def run_simulator():
     """Background task to run data simulation and analysis"""
@@ -110,10 +118,12 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Add CORS middleware
+# Add CORS middleware with configurable origins
+# Note: With allow_origins=["*"], browsers automatically disable credentials for security.
+# For production with credentials support, set ALLOWED_ORIGINS to specific domains.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
