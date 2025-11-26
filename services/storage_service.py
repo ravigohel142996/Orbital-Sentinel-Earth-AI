@@ -13,7 +13,8 @@ from typing import List, Optional, Dict, Any
 from loguru import logger
 
 import sys
-sys.path.insert(0, str(__file__).rsplit('/', 2)[0])
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from backend.models import RiskPrediction, DashboardStats, RiskType, RiskLevel
 
