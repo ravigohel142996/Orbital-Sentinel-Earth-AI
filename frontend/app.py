@@ -37,7 +37,7 @@ def get_api_base_url() -> str:
     Get API base URL with the following priority:
     1. Streamlit secrets.toml (API_BASE_URL)
     2. Environment variable (API_BASE_URL)
-    3. Default fallback (http://localhost:8000)
+    3. Default fallback (https://web-production-46749.up.railway.app/)
     """
     # Try Streamlit secrets first
     try:
@@ -53,7 +53,7 @@ def get_api_base_url() -> str:
         return env_url.rstrip("/")
 
     # Default fallback
-    return "http://localhost:8000"
+    return "https://web-production-46749.up.railway.app/"
 
 
 # API_BASE_URL can be configured via:
