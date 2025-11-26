@@ -48,8 +48,12 @@ simulator_task = None
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*")
 if ALLOWED_ORIGINS == "*":
     cors_origins = ["*"]
+    # When using wildcard origins, credentials must be disabled for browser security
+    cors_allow_credentials = False
 else:
     cors_origins = [origin.strip() for origin in ALLOWED_ORIGINS.split(",") if origin.strip()]
+    # Allow credentials when specific origins are configured
+    cors_allow_credentials = True
 
 async def run_simulator():
     """Background task to run data simulation and analysis"""
@@ -118,13 +122,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Add CORS middleware with configurable origins
-# Note: With allow_origins=["*"], browsers automatically disable credentials for security.
+# Add CORS middleware with full support for all methods and headers
+# Note: With allow_origins=["*"], credentials are automatically disabled for browser security.
 # For production with credentials support, set ALLOWED_ORIGINS to specific domains.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
-    allow_credentials=True,
+    allow_credentials=cors_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )

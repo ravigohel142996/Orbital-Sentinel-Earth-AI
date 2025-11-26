@@ -31,9 +31,36 @@ st.set_page_config(
 # Configuration
 # ==============================================================================
 
-# API_BASE_URL can be configured via environment variable for deployment
-# Falls back to localhost for local development
-API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000").rstrip("/")
+
+def get_api_base_url() -> str:
+    """
+    Get API base URL with the following priority:
+    1. Streamlit secrets.toml (API_BASE_URL)
+    2. Environment variable (API_BASE_URL)
+    3. Default fallback (http://localhost:8000)
+    """
+    # Try Streamlit secrets first
+    try:
+        if "API_BASE_URL" in st.secrets:
+            return str(st.secrets["API_BASE_URL"]).rstrip("/")
+    except (FileNotFoundError, KeyError):
+        # secrets.toml doesn't exist or API_BASE_URL key not found
+        pass
+
+    # Fall back to environment variable
+    env_url = os.getenv("API_BASE_URL")
+    if env_url:
+        return env_url.rstrip("/")
+
+    # Default fallback
+    return "http://localhost:8000"
+
+
+# API_BASE_URL can be configured via:
+# 1. Streamlit secrets.toml (API_BASE_URL)
+# 2. Environment variable (API_BASE_URL)
+# 3. Default fallback for local development
+API_BASE_URL = get_api_base_url()
 
 # Risk level colors - Enhanced neon palette
 RISK_COLORS = {
@@ -898,19 +925,35 @@ class OrbitalSentinelClient:
                 return response.json()
         except httpx.ConnectError:
             if show_error:
-                st.error(f"⚠️ Cannot connect to backend at {self.base_url}. Please ensure the API server is running or check your API_BASE_URL configuration.")
+                st.error(
+                    f"🚨 **Connection Failed**: Cannot connect to backend at `{self.base_url}`.\n\n"
+                    "**Possible solutions:**\n"
+                    "- Ensure the API server is running\n"
+                    "- Check if `API_BASE_URL` is correctly set in Streamlit secrets or environment variables\n"
+                    "- Verify network connectivity and firewall settings\n"
+                    "- For local development, start the backend with: `uvicorn backend.main:app --reload`"
+                )
             return None
         except httpx.TimeoutException:
             if show_error:
-                st.error(f"⚠️ Connection to backend timed out. The server at {self.base_url} may be slow or unresponsive.")
+                st.error(
+                    f"⏱️ **Connection Timeout**: The server at `{self.base_url}` is not responding.\n\n"
+                    "**Possible causes:**\n"
+                    "- Server is overloaded or slow to respond\n"
+                    "- Network latency issues\n"
+                    "- Backend service may need to be restarted"
+                )
             return None
         except httpx.HTTPStatusError as e:
             if show_error:
-                st.error(f"API Error: HTTP {e.response.status_code} - {e.response.text[:200]}")
+                st.error(
+                    f"❌ **API Error**: HTTP {e.response.status_code}\n\n"
+                    f"**Details:** {e.response.text[:200] if e.response.text else 'No details provided'}"
+                )
             return None
         except Exception as e:
             if show_error:
-                st.error(f"API Error: {str(e)}")
+                st.error(f"⚠️ **Unexpected Error**: {str(e)}")
             return None
     
     def is_backend_online(self) -> bool:
@@ -1018,9 +1061,19 @@ def render_status_bar():
         st.markdown(f"""
         <div class="nav-item" style="color: #FF073A;">
             <span class="status-dot status-offline"></span>
-            <span>⚠️ Backend Offline - Cannot reach {client.base_url}. Check API_BASE_URL env var or start the API server.</span>
+            <span>🔴 Backend Offline - Cannot reach {client.base_url}</span>
         </div>
         """, unsafe_allow_html=True)
+        
+        # Show additional help when backend is offline
+        st.warning(
+            f"**Backend Unreachable:** `{client.base_url}`\n\n"
+            "**To configure the API URL:**\n"
+            "1. Set `API_BASE_URL` in `.streamlit/secrets.toml`, or\n"
+            "2. Set `API_BASE_URL` environment variable\n\n"
+            "**For local development:** Start the backend server with:\n"
+            "```bash\nuvicorn backend.main:app --reload --host 0.0.0.0 --port 8000\n```"
+        )
     
     st.markdown("</div></div>", unsafe_allow_html=True)
 
