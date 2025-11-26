@@ -918,7 +918,8 @@ class OrbitalSentinelClient:
         current_time = time.time()
         if self._is_online is None or (current_time - self._last_check) > self._check_interval:
             result = self._make_request("GET", "/health", show_error=False)
-            self._is_online = result is not None and result.get("status") == "healthy"
+            # Consider backend online if we get a valid response (even if status isn't "healthy")
+            self._is_online = result is not None
             self._last_check = current_time
         return self._is_online
     
@@ -1010,14 +1011,14 @@ def render_status_bar():
             st.markdown(f"""
             <div class="nav-item" style="color: #FFE66D;">
                 <span class="status-dot status-warning"></span>
-                <span>⚠️ Backend responding but health check failed - API: {API_BASE_URL}</span>
+                <span>⚠️ Backend responding but health check failed - API: {client.base_url}</span>
             </div>
             """, unsafe_allow_html=True)
     else:
         st.markdown(f"""
         <div class="nav-item" style="color: #FF073A;">
             <span class="status-dot status-offline"></span>
-            <span>⚠️ Backend Offline - Cannot reach {API_BASE_URL}. Check API_BASE_URL env var or start the API server.</span>
+            <span>⚠️ Backend Offline - Cannot reach {client.base_url}. Check API_BASE_URL env var or start the API server.</span>
         </div>
         """, unsafe_allow_html=True)
     

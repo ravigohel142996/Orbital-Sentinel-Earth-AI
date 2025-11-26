@@ -119,8 +119,8 @@ app = FastAPI(
 )
 
 # Add CORS middleware with configurable origins
-# Note: When allow_credentials=True and allow_origins=["*"], browsers will still
-# work correctly. For production, set ALLOWED_ORIGINS to specific domains.
+# Note: With allow_origins=["*"], browsers automatically disable credentials for security.
+# For production with credentials support, set ALLOWED_ORIGINS to specific domains.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
